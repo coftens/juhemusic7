@@ -971,7 +971,7 @@ class _FavActionAnimState extends State<_FavActionAnim> with SingleTickerProvide
   }
 }
 
-class _ProgressBar extends StatelessWidget {
+class _ProgressBar extends StatefulWidget {
   const _ProgressBar({
     required this.position,
     required this.duration,
@@ -984,8 +984,16 @@ class _ProgressBar extends StatelessWidget {
   final ValueChanged<Duration> onSeek;
   final String selectedQuality;
 
+  @override
+  State<_ProgressBar> createState() => _ProgressBarState();
+}
+
+class _ProgressBarState extends State<_ProgressBar> {
+  bool _isDragging = false;
+  double _dragValue = 0.0;
+
   String _qualityLabel() {
-    return switch (selectedQuality) {
+    return switch (widget.selectedQuality) {
       'jymaster' => '超清母带',
       'sky' => '沉浸',
       'jyeffect' => '环绕',
@@ -1016,8 +1024,13 @@ class _ProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final max = math.max(1, duration.inMilliseconds);
-    final val = position.inMilliseconds.clamp(0, max).toDouble();
+    final max = math.max(1, widget.duration.inMilliseconds).toDouble();
+    final pos = widget.position.inMilliseconds.toDouble().clamp(0.0, max);
+    
+    // 如果正在拖动，显示拖动值；否则显示真实播放进度
+    final displayValue = _isDragging ? _dragValue : pos;
+    final displayTime = Duration(milliseconds: displayValue.round());
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Column(
@@ -1033,19 +1046,35 @@ class _ProgressBar extends StatelessWidget {
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             ),
             child: Slider(
-              value: val,
+              value: displayValue.clamp(0.0, max),
               min: 0,
-              max: max.toDouble(),
-              onChanged: (v) => onSeek(Duration(milliseconds: v.round())),
+              max: max,
+              onChangeStart: (v) {
+                setState(() {
+                  _isDragging = true;
+                  _dragValue = v;
+                });
+              },
+              onChanged: (v) {
+                setState(() {
+                  _dragValue = v;
+                });
+              },
+              onChangeEnd: (v) {
+                setState(() {
+                  _isDragging = false;
+                });
+                widget.onSeek(Duration(milliseconds: v.round()));
+              },
             ),
           ),
           Row(
             children: [
-              Text(_fmt(position), style: text.labelMedium?.copyWith(color: Colors.white54)),
+              Text(_fmt(displayTime), style: text.labelMedium?.copyWith(color: Colors.white54)),
               const Spacer(),
               Text(_qualityLabel(), style: text.labelLarge?.copyWith(color: Colors.white70, fontWeight: FontWeight.w600)),
               const Spacer(),
-              Text(_fmt(duration), style: text.labelMedium?.copyWith(color: Colors.white54)),
+              Text(_fmt(widget.duration), style: text.labelMedium?.copyWith(color: Colors.white54)),
             ],
           ),
         ],
